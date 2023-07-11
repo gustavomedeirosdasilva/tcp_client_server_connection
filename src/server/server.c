@@ -120,6 +120,7 @@ void server_free(server_t * server) {
     }
 
     tcp_socket_free(&(server->tcp_server));
+    tcp_socket_free(&(server->sock));
 
     pthread_mutex_destroy(&(server->mutex));
 }
