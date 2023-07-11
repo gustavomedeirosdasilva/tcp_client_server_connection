@@ -4,6 +4,8 @@
 
 #include "flow_ctrl.h"
 
+#define FLOW_CTRL_EXIT_CHAR '#'
+
 static const struct timespec flow_ctrl_task_period = {
     .tv_sec = 0,
     .tv_nsec = 1000000 /* 1ms */
@@ -36,6 +38,10 @@ static void * __flow_ctrl_sock_task(void * args) {
         if (size > 0) {
             printf("%c", c);
             fflush(stdout);
+            if (c == FLOW_CTRL_EXIT_CHAR) {
+                flow_ctrl->is_running = 0;
+                printf("\r\n[terminated by remote]\r\n");
+            }
         } else if (size == 0) {
             printf("\r\n[disconnected]\r\n");
             pthread_mutex_lock(&(flow_ctrl->mutex));
@@ -60,6 +66,11 @@ static void * __flow_ctrl_term_task(void * args) {
     while (flow_ctrl->is_running) {
         c = getchar();
         size = 0;
+
+        if (c == FLOW_CTRL_EXIT_CHAR) {
+            flow_ctrl->is_running = 0;
+            printf("\r\n[terminated by local]\r\n");
+        }
 
         if (flow_ctrl->is_connected) {
             pthread_mutex_lock(&(flow_ctrl->mutex));

@@ -25,6 +25,8 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
+    printf("Hash (#) character ends the program.\n");
+
     while (server_is_running(&server) == 1) {
         nanosleep(&task_period, NULL);
     }
