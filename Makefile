@@ -1,0 +1,57 @@
+# Makefile
+
+CC = gcc
+
+SRC_DIR = src
+OBJ_DIR = obj
+BIN_DIR = bin
+
+PROGRAM_1 = client
+PROGRAM_2 = server
+
+PROGRAM_1_DIR = $(SRC_DIR)/$(PROGRAM_1)
+PROGRAM_2_DIR = $(SRC_DIR)/$(PROGRAM_2)
+COMMON_DIR = $(SRC_DIR)/common
+
+INCLUDES = $(COMMON_DIR)
+CFLAGS = -W -Wall -pedantic -g -I$(INCLUDES)
+LDLIBS = -lpthread
+
+COMMON_SRC = $(wildcard $(COMMON_DIR)/*.c)
+COMMON_OBJ_DIR = $(OBJ_DIR)/common
+COMMON_OBJ = $(COMMON_SRC:$(COMMON_DIR)/%.c=$(COMMON_OBJ_DIR)/%.o)
+
+PROGRAM_1_SRC = $(wildcard $(PROGRAM_1_DIR)/*.c)
+PROGRAM_1_OBJ_DIR = $(OBJ_DIR)/$(PROGRAM_1)
+PROGRAM_1_OBJ = $(PROGRAM_1_SRC:$(PROGRAM_1_DIR)/%.c=$(PROGRAM_1_OBJ_DIR)/%.o)
+PROGRAM_1_BIN = $(BIN_DIR)/$(PROGRAM_1)
+
+PROGRAM_2_SRC = $(wildcard $(PROGRAM_2_DIR)/*.c)
+PROGRAM_2_OBJ_DIR = $(OBJ_DIR)/$(PROGRAM_2)
+PROGRAM_2_OBJ = $(PROGRAM_2_SRC:$(PROGRAM_2_DIR)/%.c=$(PROGRAM_2_OBJ_DIR)/%.o)
+PROGRAM_2_BIN = $(BIN_DIR)/$(PROGRAM_2)
+
+.PHONY: clean
+
+all: $(PROGRAM_1_BIN) $(PROGRAM_2_BIN)
+
+$(PROGRAM_1_BIN): $(PROGRAM_1_OBJ) $(COMMON_OBJ) | $(BIN_DIR)
+	$(CC) $^ $(LDLIBS) -o $@
+
+$(PROGRAM_2_BIN): $(PROGRAM_2_OBJ) $(COMMON_OBJ) | $(BIN_DIR)
+	$(CC) $^ $(LDLIBS) -o $@
+
+$(PROGRAM_1_OBJ_DIR)/%.o: $(PROGRAM_1_DIR)/%.c | $(PROGRAM_1_OBJ_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(PROGRAM_2_OBJ_DIR)/%.o: $(PROGRAM_2_DIR)/%.c | $(PROGRAM_2_OBJ_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(COMMON_OBJ_DIR)/%.o: $(COMMON_DIR)/%.c | $(COMMON_OBJ_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BIN_DIR) $(PROGRAM_1_OBJ_DIR) $(OBJ_DIR)/$(PROGRAM_2) $(COMMON_OBJ_DIR):
+	mkdir -p $@
+
+clean:
+	@$(RM) -rv $(BIN_DIR) $(OBJ_DIR)
