@@ -4,6 +4,7 @@
 #include "server.h"
 
 static int __server_connect_handler(flow_ctrl_t * flow_ctrl) {
+    int ret;
     server_t * server;
 
     if (!flow_ctrl) {
@@ -12,11 +13,26 @@ static int __server_connect_handler(flow_ctrl_t * flow_ctrl) {
 
     server = (server_t *) flow_ctrl->user_data;
 
-    if (tcp_socket_server_wait_new_conn(&(server->tcp_server), &(flow_ctrl->sock))) {
-        return 0;
+    if (tcp_socket_init(&(server->tcp_server), NULL, server->port)) {
+        server_free(server);
+        return -1;
     }
 
-    return 1;
+    if (tcp_socket_server_start(&(server->tcp_server))) {
+        server_free(server);
+        return -1;
+    }
+
+    if (tcp_socket_server_wait_new_conn(&(server->tcp_server), &(flow_ctrl->sock))) {
+        ret = 0;
+    } else {
+        ret = 1;
+    }
+
+    /* Accept only one connection. Close server socket */
+    tcp_socket_free(&(server->tcp_server));
+
+    return ret;
 }
 
 int server_start(server_t * server, int port) {
@@ -27,15 +43,7 @@ int server_start(server_t * server, int port) {
 
     memset((void *) server, 0, sizeof(server_t));
 
-    if (tcp_socket_init(&(server->tcp_server), NULL, port)) {
-        server_free(server);
-        return -1;
-    }
-
-    if (tcp_socket_server_start(&(server->tcp_server))) {
-        server_free(server);
-        return -1;
-    }
+    server->port = port;
 
     if (flow_ctrl_start(&(server->flow_ctrl), __server_connect_handler, (void *) server) < 0) {
         return -1;

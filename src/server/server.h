@@ -9,6 +9,7 @@
 typedef struct server {
     flow_ctrl_t flow_ctrl;
     tcp_socket_t tcp_server;
+    int port;
 } server_t;
 
 int server_start(server_t * server, int port);
