@@ -1,69 +1,22 @@
-#include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 #include <errno.h>
-#include <pthread.h>
-#include <time.h>
 
 #include "server.h"
 
-static const struct timespec task_period = {
-    .tv_sec = 0,
-    .tv_nsec = 1000000 /* 1ms */
-};
-
-static void * __server_sock_task(void * args) {
-    char c;
-    ssize_t size;
+static int __server_connect_handler(flow_ctrl_t * flow_ctrl) {
     server_t * server;
 
-    server = (server_t *) args;
-    server->is_running = 1;
-
-    while (server->is_running) {
-        if (!(server->is_connected)) {
-            if (tcp_socket_server_wait_new_conn(&(server->tcp_server), &(server->sock))) {
-                nanosleep(&task_period, NULL);
-                continue;
-            }
-            server->is_connected = 1;
-        }
-
-        pthread_mutex_lock(&(server->mutex));
-        size = tcp_socket_read_nonblock(&(server->sock), &c, sizeof(c));
-        pthread_mutex_unlock(&(server->mutex));
-
-        if (size > 0) {
-            printf("%c", c);
-            fflush(stdout);
-        } else if (size == 0) {
-            server->is_connected = 0;
-        }
-
-        nanosleep(&task_period, NULL);
+    if (!flow_ctrl) {
+        return -1;
     }
 
-    return NULL;
-}
+    server = (server_t *) flow_ctrl->user_data;
 
-static void * __server_term_task(void * args) {
-    char c;
-    server_t * server;
-
-    server = (server_t *) args;
-    server->is_running = 1;
-
-    while (server->is_running) {
-        c = getchar();
-
-        pthread_mutex_lock(&(server->mutex));
-        if (server->is_connected) {
-            tcp_socket_write(&(server->sock), &c, 1);
-        }
-        pthread_mutex_unlock(&(server->mutex));
+    if (tcp_socket_server_wait_new_conn(&(server->tcp_server), &(flow_ctrl->sock))) {
+        return 0;
     }
 
-    return NULL;
+    return 1;
 }
 
 int server_start(server_t * server, int port) {
@@ -84,18 +37,7 @@ int server_start(server_t * server, int port) {
         return -1;
     }
 
-    if (pthread_mutex_init(&(server->mutex), NULL) != 0) {
-        server_free(server);
-        return -1;
-    }
-
-    if (pthread_create(&(server->term_tid), NULL, &__server_term_task, server) < 0) {
-        server_free(server);
-        return -1;
-    }
-
-    if (pthread_create(&(server->sock_tid), NULL, &__server_sock_task, server) < 0) {
-        server_free(server);
+    if (flow_ctrl_start(&(server->flow_ctrl), __server_connect_handler, (void *) server) < 0) {
         return -1;
     }
 
@@ -107,22 +49,9 @@ void server_free(server_t * server) {
         return;
     }
 
-    server->is_running = 0;
-
-    if (server->term_tid) {
-        pthread_cancel(server->term_tid);
-        pthread_join(server->term_tid, NULL);
-    }
-
-    if (server->sock_tid) {
-        pthread_cancel(server->sock_tid);
-        pthread_join(server->sock_tid, NULL);
-    }
-
     tcp_socket_free(&(server->tcp_server));
-    tcp_socket_free(&(server->sock));
 
-    pthread_mutex_destroy(&(server->mutex));
+    flow_ctrl_free(&(server->flow_ctrl));
 }
 
 int server_is_running(const server_t * server) {
@@ -131,5 +60,5 @@ int server_is_running(const server_t * server) {
         return -1;
     }
 
-    return server->is_running;
+    return server->flow_ctrl.is_running;
 }
